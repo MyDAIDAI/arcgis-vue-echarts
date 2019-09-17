@@ -24,6 +24,8 @@ module.exports = {
     // allow async-await
     'generator-star-spacing': 'off',
     // allow debugger during development
-    'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off'
+    'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
+    'quotes': 0,
+    'new-cap': 0,//函数名首行大写必须使用new方式调用，首行小写必须用不带new方式调用
   }
 }
