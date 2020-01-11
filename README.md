@@ -5,9 +5,8 @@
 ## 关于版本
 
 - `vue 2.5.2`
-- `arcgis 3.20`
+- `arcgis 3.20`[文档地址](https://developers.arcgis.com/)
 - `echarts 4.2.1`
-  
 ## `vue`中地图初始化渲染
 
 - 安装`esri-loader` -> `npm install --save esri-loader`
