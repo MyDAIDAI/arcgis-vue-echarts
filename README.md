@@ -189,9 +189,34 @@
   }
   ```
 
+## 地图标注图片添加
+
+```javascript
+this.markerGraphicLayer = new this.ArcMap.GraphicsLayer({
+  id: 'markerLayer'
+})
+this.map.addLayer(this.markerGraphicLayer) // 添加撒点标注图层
+
+// 遍历点的经纬度，添加到标注图层
+// 大数据量渲染不推荐该方法
+addPointHandler () {
+  Points.forEach(ele => {
+    let point = new this.ArcMap.Point(ele[1], ele[0])
+    let picSymbol = new this.ArcMap.PictureMarkerSymbol({
+      'url': '/static/sadian-moren.svg'
+    })
+    picSymbol.setWidth(32)
+    picSymbol.setHeight(51)
+    picSymbol.setOffset(0, 25.5)
+    let graphic = new this.ArcMap.graphic(point, picSymbol)
+    this.markerGraphicLayer.add(graphic)
+  })
+},
+```
+
 ## 功能清单
 
-- [ ] 地图标注图片添加
+- [x] 地图标注图片添加
 - [ ] 地图自定义`infoWindow`类
 - [ ] 地图`echarts`引用
   - [ ] 地图图层中渲染`echarts`

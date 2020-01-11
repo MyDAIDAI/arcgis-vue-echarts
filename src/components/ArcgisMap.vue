@@ -1,5 +1,9 @@
 <template>
   <div class="map-wrapper">
+    <div style="padding: 20px">
+      <button @click="addPointHandler">撒点</button>
+      <button @click="clearPointHandler">清除撒点</button>
+    </div>
     <div id="mapContainer" class="map-container"></div>
   </div>
 </template>
@@ -7,13 +11,15 @@
 <script>
 import * as esriLoader from 'esri-loader'
 import Util from '@/common/js/util'
+const Points = [[39.9180560000, 116.3970270000], [40.0773300000, 116.6003900000], [39.9111400000, 116.4113500000], [39.9350000000, 116.4543600000]]
 export default {
   name: 'arcgisMap',
   data () {
     return {
       map: '',
       ArcMap: {},
-      DoJo: {}
+      DoJo: {},
+      markerGraphicLayer: ''
     }
   },
   created () {
@@ -58,6 +64,22 @@ export default {
     this.initMap()
   },
   methods: {
+    addPointHandler () {
+      Points.forEach(ele => {
+        let point = new this.ArcMap.Point(ele[1], ele[0])
+        let picSymbol = new this.ArcMap.PictureMarkerSymbol({
+          'url': '/static/sadian-moren.svg'
+        })
+        picSymbol.setWidth(32)
+        picSymbol.setHeight(51)
+        picSymbol.setOffset(0, 25.5)
+        let graphic = new this.ArcMap.graphic(point, picSymbol)
+        this.markerGraphicLayer.add(graphic)
+      })
+    },
+    clearPointHandler () {
+      this.markerGraphicLayer.clear()
+    },
     initMap () {
       esriLoader.loadModules(this.loadModules, {
         // javaScript接口地址
@@ -70,25 +92,23 @@ export default {
         // let InfoWindow = this.initInfoWindow()
         // let infoWindow = new InfoWindow({domNode: this.DoJo.domConstruct.create("div", null, this.DoJo.dom.byId("mapContainer"))})
         this.map = new this.ArcMap.map('mapContainer', {
-          center: [121.26634830225001, 31.161768013013],
+          center: [116.3970270000, 39.9180560000],
           // zooms: [1, 18],
           logo: false, // logo
           slider: false, // 缩小按钮,
-          minZoom: 5,
+          minZoom: 10,
           maxZoom: 18,
           autoResize: true
           // infoWindow: infoWindow
         })
-        // this.map.centerAndZoom([121.26634830225001, 31.161768013013], 13)
         let baseLayer = new GaoDeLayer()// 默认加载矢量 new gaodeLayer({layertype:"road"});也可以
+        this.markerGraphicLayer = new this.ArcMap.GraphicsLayer({
+          id: 'markerLayer'
+        })
         this.map.on('load', () => {
         })
         this.map.addLayer(baseLayer) // 添加高德地图到map容器
-        if (window.config.local) {
-          let LabelLayer = this.initGaoDeLayer('label')
-          let labelLayer = new LabelLayer() // 加载标注图
-          this.map.addLayer(labelLayer)
-        }
+        this.map.addLayer(this.markerGraphicLayer) // 添加撒点标注图层
       }).catch(err => {
         console.log('err', err)
       })
@@ -249,9 +269,13 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-.map-container {
+.map-wrapper {
   width: 100%;
   height: 100%;
+}
+.map-container {
+  width: 100%;
+  height: 80%;
   /*flex: 1;*/
 }
 </style>
