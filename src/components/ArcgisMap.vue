@@ -11,6 +11,7 @@
 <script>
 import * as esriLoader from 'esri-loader'
 import Util from '@/common/js/util'
+import $ from 'jquery'
 const Points = [[39.9180560000, 116.3970270000], [40.0773300000, 116.6003900000], [39.9111400000, 116.4113500000], [39.9350000000, 116.4543600000]]
 export default {
   name: 'arcgisMap',
@@ -19,7 +20,8 @@ export default {
       map: '',
       ArcMap: {},
       DoJo: {},
-      markerGraphicLayer: ''
+      markerGraphicLayer: '',
+      infoWindowObj: {}
     }
   },
   created () {
@@ -59,7 +61,9 @@ export default {
       'esri/dijit/InfoWindow',
       'esri/symbols/PictureFillSymbol',
       'esri/symbols/CartographicLineSymbol',
-      'esri/geometry/webMercatorUtils'
+      'esri/geometry/webMercatorUtils',
+      "esri/dijit/PopupTemplate",
+      "esri/dijit/Popup"
     ]
     this.initMap()
   },
@@ -88,9 +92,9 @@ export default {
       }).then((fnArr) => {
         this.setMapObject(fnArr)
         let GaoDeLayer = this.initGaoDeLayer()
-        // this.overrideFn = this.overrideHandler()
-        // let InfoWindow = this.initInfoWindow()
-        // let infoWindow = new InfoWindow({domNode: this.DoJo.domConstruct.create("div", null, this.DoJo.dom.byId("mapContainer"))})
+        this.overrideFn = this.overrideHandler()
+        let InfoWindow = this.initInfoWindow()
+        let infoWindow = new InfoWindow({domNode: this.DoJo.domConstruct.create("div", null, this.DoJo.dom.byId("mapContainer")), width: 300, height: 200})
         this.map = new this.ArcMap.map('mapContainer', {
           center: [116.3970270000, 39.9180560000],
           // zooms: [1, 18],
@@ -98,8 +102,8 @@ export default {
           slider: false, // 缩小按钮,
           minZoom: 10,
           maxZoom: 18,
-          autoResize: true
-          // infoWindow: infoWindow
+          autoResize: true,
+          infoWindow: infoWindow
         })
         let baseLayer = new GaoDeLayer()// 默认加载矢量 new gaodeLayer({layertype:"road"});也可以
         this.markerGraphicLayer = new this.ArcMap.GraphicsLayer({
@@ -107,11 +111,32 @@ export default {
         })
         this.map.on('load', () => {
         })
+        this.markerGraphicLayer.on('click', (evt) => {
+          let graphic = evt.graphic
+          console.log('evt', evt)
+          // var loc = this.map.toScreen(graphic.geometry)
+          // this.map.infoWindow.setFeatures([graphic])
+          // this.map.infoWindow.show(loc)
+          // console.log('graphic', graphic)
+          this.setInfoWindow(graphic)
+        })
+
         this.map.addLayer(baseLayer) // 添加高德地图到map容器
         this.map.addLayer(this.markerGraphicLayer) // 添加撒点标注图层
       }).catch(err => {
         console.log('err', err)
       })
+    },
+    setInfoWindow (data) {
+      let point = new this.ArcMap.Point(data.geometry.x, data.geometry.y)
+      this.map.infoWindow.resize(364)
+      this.map.infoWindow.setContent(this.setInfoContent())
+      this.map.infoWindow.show(point)
+    },
+    setInfoContent () {
+      return `<div style="padding: 16px 20px">
+        这是一个窗口
+        </div>`
     },
     setMapObject (fnArr) {
       this.loadModules.forEach((ele, index) => {
@@ -130,6 +155,144 @@ export default {
         }
       })
       console.log('ArcMap', this.ArcMap, this.DoJo)
+    },
+    // inherited 严格模式兼容处理
+    overrideHandler () {
+      let slice = Array.prototype.slice
+      return function (method) {
+        let proxy
+
+        /** @this target object */
+        proxy = function () {
+          let me = this
+          var inherited = (this.getInherited && this.getInherited({
+            // emulating empty arguments
+            callee: proxy,
+            length: 0
+          })) || function () {}
+
+          return method.apply(me, [function () {
+            return inherited.apply(me, arguments)
+          }].concat(slice.apply(arguments)))
+        }
+
+        proxy.method = method
+        proxy.overrides = true
+
+        return proxy
+      }
+    },
+    initInfoWindow () {
+      let infoWidth = 324
+      let infoHeight = 200
+      let initMapCenter
+      let initScreenCenter
+      let showMapPoint = null
+      let showScreenPoint = null
+      let that = this
+      return that.DoJo.declare([that.ArcMap.InfoWindowBase, that.DoJo.Evented],
+        {
+          constructor: function (parameters) {
+            that.DoJo.lang.mixin(this, parameters)
+            that.DoJo.domClass.add(this.domNode, "myInfoWindow")
+            this._closeButton = that.DoJo.domConstruct.create("div", {"class": "info-close", "title": "关闭"}, this.domNode)
+            this._title = that.DoJo.domConstruct.create("div", {"class": "info-title"}, this.domNode)
+            this._content = that.DoJo.domConstruct.create("div", {"class": "info-content"}, this.domNode)
+            this._arrow = that.DoJo.domConstruct.create("div", {"class": "info-arrow"}, this.domNode)
+            that.DoJo.on(this._closeButton, "click", that.DoJo.lang.hitch(this, function () {
+              this.hide()
+            }))
+            that.ArcMap.domUtils.hide(this.domNode)
+            this.isShowing = false
+          },
+          setMap: that.overrideFn(function (inherited, map) {
+            inherited(arguments)
+            map.on("pan", that.DoJo.lang.hitch(this, function (pan) {
+              let movePoint = pan.delta
+              if (this.isShowing) {
+                if (showScreenPoint !== null) {
+                  this._showInfoWindow(showScreenPoint.x + movePoint.x, showScreenPoint.y + movePoint.y)
+                }
+              }
+            }))
+            map.on("pan-end", that.DoJo.lang.hitch(this, function (panend) {
+              var movedelta = panend.delta
+              if (this.isShowing) {
+                showScreenPoint.x = showScreenPoint.x + movedelta.x
+                showScreenPoint.y = showScreenPoint.y + movedelta.y
+              }
+            }))
+            map.on("zoom-start", that.DoJo.lang.hitch(this, function () {
+              that.ArcMap.domUtils.hide(this.domNode)
+              this.onHide()
+            }))
+            map.on("zoom-end", that.DoJo.lang.hitch(this, function () {
+              if (this.isShowing) {
+                showScreenPoint = that.map.toScreen(showMapPoint)
+                this._showInfoWindow(showScreenPoint.x, showScreenPoint.y)
+              }
+            }))
+          }),
+          setTitle: function (title) {
+            this.place(title, this._title)
+          },
+          setContent: function (content) {
+            this.place(content, this._content)
+          },
+          _showInfoWindow: function (x, y) {
+            that.DoJo.domStyle.set(this.domNode, {
+              "left": x - infoWidth / 2 + this.offset.x + "px",
+              "top": y - infoHeight - 50 - this.offset.y + "px"
+            })
+            that.ArcMap.domUtils.show(this.domNode)
+          },
+          show: function (location, offset) {
+            this.offset = that.DoJo.dojo.mixin({x: 0, y: 0}, offset)
+            showMapPoint = location
+            initMapCenter = that.map.extent.getCenter()
+            initScreenCenter = that.map.toScreen(initMapCenter)
+            infoHeight = $(".myInfoWindow").height()
+            infoWidth = $(".myInfoWindow").width()
+            if (infoWidth < 20 || infoHeight < 20) {
+              this.resize(300, 200)
+            }
+            if (location.spatialReference) {
+              location = that.map.toScreen(location)
+            }
+            var left = location.x - infoWidth / 2
+            var top = location.y - infoHeight - 75
+            showScreenPoint = location
+            if (top < 5) {
+              initScreenCenter.y = initScreenCenter.y + top - 5
+            }
+            if (left < 5) {
+              initScreenCenter.x = initScreenCenter.x + left - 5
+            }
+            this._showInfoWindow(showScreenPoint.x, showScreenPoint.y)
+            // initMapCenter = that.map.toMap(initScreenCenter)
+            // this.map.centerAt(initMapCenter);
+            this.isShowing = true
+            this.onShow()
+          },
+          hide: function () {
+            that.ArcMap.domUtils.hide(this.domNode)
+            this.isShowing = false
+            this.onHide()
+          },
+          resize: function (width, height) {
+            that.DoJo.domStyle.set(this._content, {
+              "width": width + "px",
+              "height": (height - 60) + "px"
+            })
+            that.DoJo.domStyle.set(this._title, {
+              "width": width + "px"
+            })
+          },
+          destroy: function () {
+            that.DoJo.domConstruct.destroy(this.domNode)
+            this._closeButton = this._title = this._content = null
+          }
+        })
     },
     initGaoDeLayer (type = 'road') {
       let that = this
@@ -268,7 +431,7 @@ export default {
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped>
+<style>
 .map-wrapper {
   width: 100%;
   height: 100%;
@@ -276,6 +439,55 @@ export default {
 .map-container {
   width: 100%;
   height: 80%;
+  position: relative;
   /*flex: 1;*/
+}
+.myInfoWindow {
+  position: absolute;
+  z-index: 100;
+  font-family: sans-serif;
+  font-size: 12px;
+  background:rgba(255,255,255,1);
+  filter: drop-shadow(0px 2px 5px rgba(31,56,88,0.3));
+  box-shadow:0px 2px 5px 0px rgba(31,56,88,0.3);
+  border-radius:3px 3px 3px 0px;
+  width: 364px;
+  height: 200px;
+  box-sizing: border-box;
+}
+.info-content {
+  border-radius:10px;
+  position: relative;
+  background-color:#ffffff;
+  color:#353535;
+  overflow: auto;
+}
+.info-close {
+  position: absolute; top: 5px; right: 5px;
+  cursor: pointer;
+  /*background: url(../images/infowindow_close.png) no-repeat scroll 0 0 transparent;*/
+  width: 12px;
+  height: 12px;
+}
+.info-close:hover  {
+  background-color: red;
+}
+.info-title {
+  border-radius:10px;
+  font-weight: bold;
+  /* background-color:#4774d9; */
+  color:#ffffff;
+  /*height:20px;*/
+}
+.info-arrow {
+  width: 0;
+  height: 0;
+  position: absolute;
+  bottom: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #ffffff;
+  margin-left: 178px;
+  /*box-shadow:0px 2px 5px 0px rgba(31,56,88,0.3);*/
 }
 </style>
