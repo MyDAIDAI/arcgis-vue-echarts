@@ -216,7 +216,7 @@ addPointHandler () {
 ## 功能清单
 
 - [x] 地图标注图片添加
-- [ ] 地图自定义`infoWindow`类
+- [x] 地图自定义`infoWindow`类
 - [ ] 地图`echarts`引用
   - [ ] 地图图层中渲染`echarts`
   - [ ] `infoWindow`中渲染`echarts`
